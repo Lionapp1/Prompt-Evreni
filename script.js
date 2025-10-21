@@ -6,12 +6,13 @@
 // <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCxU8TbgXda7KXgYsNLKkeAbhug3E2mc78",
+  authDomain: "prompt-131c4.firebaseapp.com",
+  projectId: "prompt-131c4",
+  storageBucket: "prompt-131c4.firebasestorage.app",
+  messagingSenderId: "128172389927",
+  appId: "1:128172389927:web:87cbc9f0b0f243dd504002",
+  measurementId: "G-3RSCHK789E"
 };
 
 firebase.initializeApp(firebaseConfig);
