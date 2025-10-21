@@ -6,25 +6,18 @@
 // <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCxU8TbgXda7KXgYsNLKkeAbhug3E2mc78",
-  authDomain: "prompt-131c4.firebaseapp.com",
-  projectId: "prompt-131c4",
-  storageBucket: "prompt-131c4.firebasestorage.app",
-  messagingSenderId: "128172389927",
-  appId: "1:128172389927:web:87cbc9f0b0f243dd504002",
-  measurementId: "G-3RSCHK789E"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
-
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-const promptsCollection = db.collection('prompts');
 
 document.addEventListener('DOMContentLoaded', () => {
     const allNavLinks = document.querySelectorAll('.nav-link[data-page], .form-switch a[data-page]');
     const pages = document.querySelectorAll('.page');
-    const mainNavLinks = document.querySelectorAll('.nav-links .nav-link');
-
+    
     const loginLink = document.getElementById('login-link');
     const registerLink = document.getElementById('register-link');
     const logoutLink = document.getElementById('logout-link');
@@ -38,13 +31,66 @@ document.addEventListener('DOMContentLoaded', () => {
     const promptCardTemplate = document.getElementById('prompt-card-template');
     const toast = document.getElementById('toast-notification');
 
+    // --- YEREL VERİ VE OTURUM YÖNETİMİ (Firebase Simülasyonu) ---
+    let currentUser = null;
+    let prompts = [];
+
+    const samplePrompts = [
+        {
+            title: "Sosyal Medya İçerik Fikri",
+            text: "Bir teknoloji şirketi için bir sonraki ürün lansmanını duyuran 3 yaratıcı Instagram gönderi fikri oluştur.",
+            model: "GPT-4",
+            authorEmail: "ornek@kullanici.com",
+            createdAt: new Date()
+        },
+        {
+            title: "Fantastik Manzara Çizimi",
+            text: "Uçan adaların ve parlayan şelalelerin olduğu, fantastik bir dünya manzarası, dijital sanat.",
+            model: "Midjourney",
+            authorEmail: "ornek@kullanici.com",
+            createdAt: new Date()
+        }
+    ];
+
+    const getPromptsFromStorage = () => {
+        const storedPrompts = localStorage.getItem('prompts');
+        if (storedPrompts) {
+            return JSON.parse(storedPrompts);
+        } else {
+            localStorage.setItem('prompts', JSON.stringify(samplePrompts));
+            return samplePrompts;
+        }
+    };
+
+    const savePromptsToStorage = () => {
+        localStorage.setItem('prompts', JSON.stringify(prompts));
+    };
+
+    const getCurrentUser = () => {
+        const userJson = localStorage.getItem('currentUser');
+        return userJson ? JSON.parse(userJson) : null;
+    };
+
+    const setCurrentUser = (user) => {
+        if (user) {
+            localStorage.setItem('currentUser', JSON.stringify(user));
+        } else {
+            localStorage.removeItem('currentUser');
+        }
+        currentUser = user;
+        updateUIForAuthState(currentUser);
+    };
+
+    // --- ARAYÜZ FONKSİYONLARI ---
+
     const showPage = (pageId) => {
         pages.forEach(page => page.classList.remove('active'));
         const activePage = document.getElementById(pageId);
         if(activePage) activePage.classList.add('active');
 
-        allNavLinks.forEach(link => link.classList.remove('active'));
-        document.querySelector(`.nav-link[data-page='${pageId}']`)?.classList.add('active');
+        document.querySelectorAll('.nav-links .nav-link').forEach(link => link.classList.remove('active'));
+        const mainNavLink = document.querySelector(`.nav-links .nav-link[data-page='${pageId}']`);
+        if (mainNavLink) mainNavLink.classList.add('active');
     };
 
     const showToast = (message, isError = false) => {
@@ -70,13 +116,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    auth.onAuthStateChanged(user => {
-        updateUIForAuthState(user);
-        fetchAndRenderPrompts(); 
-        if (!user) {
-            showPage('prompts-page');
+    const renderPrompts = () => {
+        promptGrid.innerHTML = '';
+        if (prompts.length === 0) {
+            promptGrid.innerHTML = '<p style="color: var(--text-secondary);">Henüz hiç prompt paylaşılmamış. İlk paylaşan sen ol!</p>';
+            return;
         }
-    });
+        
+        const sortedPrompts = [...prompts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        sortedPrompts.forEach(promptData => {
+            const card = promptCardTemplate.content.cloneNode(true).children[0];
+            card.querySelector('.card-title').textContent = promptData.title;
+            card.querySelector('.card-body').textContent = promptData.text;
+            card.querySelector('.ai-model-tag').textContent = promptData.model;
+            card.dataset.promptText = promptData.text;
+            promptGrid.appendChild(card);
+        });
+    };
+
+    // --- OLAY DİNLEYİCİLERİ ---
 
     allNavLinks.forEach(link => {
         link.addEventListener('click', e => {
@@ -88,85 +147,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logoutLink.addEventListener('click', e => {
         e.preventDefault();
-        auth.signOut().then(() => {
-            showToast('Başarıyla çıkış yapıldı.');
-            showPage('prompts-page');
-        }).catch(error => showToast(`Çıkış hatası: ${error.message}`, true));
+        setCurrentUser(null);
+        showToast('Başarıyla çıkış yapıldı.');
+        showPage('prompts-page');
     });
 
     registerForm.addEventListener('submit', e => {
         e.preventDefault();
         const email = document.getElementById('register-email').value;
-        const password = document.getElementById('register-password').value;
-        auth.createUserWithEmailAndPassword(email, password)
-            .then(userCredential => {
-                showToast('Başarıyla kayıt olundu! Hoş geldiniz.');
-                showPage('prompts-page');
-                registerForm.reset();
-            })
-            .catch(error => showToast(`Kayıt hatası: ${error.message}`, true));
+        const newUser = { email };
+        setCurrentUser(newUser);
+        showToast('Başarıyla kayıt olundu! Hoş geldiniz.');
+        showPage('prompts-page');
+        registerForm.reset();
     });
 
     loginForm.addEventListener('submit', e => {
         e.preventDefault();
         const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
-        auth.signInWithEmailAndPassword(email, password)
-            .then(userCredential => {
-                showToast('Başarıyla giriş yapıldı.');
-                showPage('prompts-page');
-                loginForm.reset();
-            })
-            .catch(error => showToast(`Giriş hatası: ${error.message}`, true));
+        const user = { email };
+        setCurrentUser(user);
+        showToast('Başarıyla giriş yapıldı.');
+        showPage('prompts-page');
+        loginForm.reset();
     });
 
     addPromptForm.addEventListener('submit', e => {
         e.preventDefault();
-        const user = auth.currentUser;
-        if (!user) {
+        if (!currentUser) {
             showToast('Prompt eklemek için giriş yapmalısınız.', true);
+            showPage('login-page');
             return;
         }
 
-        const title = document.getElementById('prompt-title').value;
-        const text = document.getElementById('prompt-text').value;
-        const model = document.getElementById('ai-model').value;
+        const newPrompt = {
+            title: document.getElementById('prompt-title').value,
+            text: document.getElementById('prompt-text').value,
+            model: document.getElementById('ai-model').value,
+            authorEmail: currentUser.email,
+            createdAt: new Date().toISOString()
+        };
 
-        promptsCollection.add({
-            title,
-            text,
-            model,
-            authorId: user.uid,
-            authorEmail: user.email,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(() => {
-            showToast('Prompt başarıyla paylaşıldı!');
-            addPromptForm.reset();
-            showPage('prompts-page');
-        }).catch(error => showToast(`Hata: ${error.message}`, true));
+        prompts.push(newPrompt);
+        savePromptsToStorage();
+        renderPrompts();
+        showToast('Prompt başarıyla paylaşıldı!');
+        addPromptForm.reset();
+        showPage('prompts-page');
     });
-
-    const fetchAndRenderPrompts = () => {
-        promptsCollection.orderBy('createdAt', 'desc').onSnapshot(snapshot => {
-            promptGrid.innerHTML = '';
-            if (snapshot.empty) {
-                promptGrid.innerHTML = '<p style="color: var(--text-secondary);">Henüz hiç prompt paylaşılmamış. İlk paylaşan sen ol!</p>';
-                return;
-            }
-            snapshot.forEach(doc => {
-                const promptData = doc.data();
-                const card = promptCardTemplate.content.cloneNode(true).children[0];
-                card.querySelector('.card-title').textContent = promptData.title;
-                card.querySelector('.card-body').textContent = promptData.text;
-                card.querySelector('.ai-model-tag').textContent = promptData.model;
-                card.dataset.promptText = promptData.text;
-                promptGrid.appendChild(card);
-            });
-        }, error => {
-            console.error("Promptları çekerken hata: ", error);
-            promptGrid.innerHTML = '<p style="color: var(--text-secondary);">Promptlar yüklenirken bir hata oluştu.</p>';
-        });
-    };
 
     promptGrid.addEventListener('click', e => {
         const copyBtn = e.target.closest('.copy-btn');
@@ -184,4 +212,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    // --- BAŞLANGIÇ ---
+    const initializeApp = () => {
+        currentUser = getCurrentUser();
+        prompts = getPromptsFromStorage();
+        updateUIForAuthState(currentUser);
+        renderPrompts();
+        showPage('prompts-page'); 
+    };
+
+    initializeApp();
 });
